@@ -1,0 +1,13 @@
+node_modules/
+dist/
+build/
+.direnv
+*.tsbuildinfo
+
+# Basemap archives (large; fetch with `nix run .#download-basemap`)
+apps/web/public/*.pmtiles
+data/*.pmtiles
+
+.env
+.env.local
+.DS_Store

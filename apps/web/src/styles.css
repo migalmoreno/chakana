@@ -1,0 +1,27 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+/* MapLibre popups inherit Tailwind's preflight resets poorly; restore basics. */
+.maplibregl-popup-content {
+  padding: 0;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  background: var(--color-neutral-900);
+  color: var(--color-neutral-100);
+}
+
+.maplibregl-popup-close-button {
+  padding: 0 4px;
+  color: var(--color-neutral-400);
+  font-size: 14px;
+}

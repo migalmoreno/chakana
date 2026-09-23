@@ -1,0 +1,29 @@
+{
+  "server": {
+    "host": "0.0.0.0",
+    "port": 8080
+  },
+  "map": {
+    "initial": {
+      "longitude": 10,
+      "latitude": 30,
+      "zoom": 1.6
+    }
+  },
+  "mullvad": {
+    "relays_url": "https://api.mullvad.net/public/relays/wireguard/v1/",
+    "cache_ttl_seconds": 3600
+  },
+  "wireguard": {
+    "interface": "mullvad0",
+    "allowed_ips": ["0.0.0.0/1", "128.0.0.0/1", "::/1", "8000::/1"],
+    "persistent_keepalive": 25,
+    "port": 51820,
+    "ip_command": "ip",
+    "wg_command": "wg"
+  },
+  "driver": {
+    "active": "mullvad-wireguard"
+  },
+  "allowed_countries": []
+}

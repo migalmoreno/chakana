@@ -1,0 +1,34 @@
+# -*- org-html-head-include-default-style: nil; org-html-postamble: nil; -*-
+#+OPTIONS: toc:nil num:nil
+#+title: chakana
+Chakana is a self-hosted map-driven orchestration tool.
+
+* Installation
+There's a Docker Compose file available which you can run locally like this:
+
+#+begin_src sh
+docker compose up -d
+#+end_src
+
+The web UI is available on port 80.
+
+* Development
+The project uses Nix to provide its development dependencies. Enter the dev shell with:
+
+#+begin_src sh
+nix develop
+#+end_src
+
+Before running the application, the map needs a basemap archive. Fetch it once with:
+
+#+begin_src sh
+nix run .#download-basemap
+#+end_src
+
+To bring up the API and the web dev server invoke the following:
+
+#+begin_src sh
+nix run .
+#+end_src
+
+The web dev server proxies =/api= to the API on port 8080.

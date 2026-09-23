@@ -1,0 +1,30 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    image: chakana-api
+    restart: unless-stopped
+    environment:
+      CHAKANA_CONFIG: /config/config.json
+    volumes:
+      - ./apps/web/public/config.json:/config/config.json:ro
+    # The driver re-keys the host WireGuard interface with `ip`/`wg`, so the
+    # container needs NET_ADMIN and access to the host network. The API binds
+    # host port 8080 (config.server.port).
+    cap_add:
+      - NET_ADMIN
+    network_mode: host
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    image: chakana-web
+    restart: unless-stopped
+    depends_on:
+      - api
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "80:80"
