@@ -38,10 +38,12 @@ jobs:
         uses: docker/bake-action@v6
         with:
           source: "."
-          files: docker-compose.yml
           push: true
           set: |
             api.tags=${{ env.REGISTRY }}/${{ github.repository }}-api:latest
             web.tags=${{ env.REGISTRY }}/${{ github.repository }}-web:latest
             *.cache-from=type=gha
             *.cache-to=type=gha,mode=max
+
+      - name: Deploy
+        run: curl ${{ vars.WEBHOOK_URL }}/hooks/chakana-deploy
