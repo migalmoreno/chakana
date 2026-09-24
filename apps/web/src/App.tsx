@@ -17,6 +17,7 @@ export const App = () => {
   const [selected, setSelected] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   useEffect(() => {
     getConfig()
@@ -48,6 +49,7 @@ export const App = () => {
   const onSelect = async (relay: Relay) => {
     setBusy(true);
     setSelected(relay.hostname);
+    setDrawerOpen(false);
     const toastId = toast.loading(`Switching to ${relay.hostname}…`);
     try {
       const result = await switchRelay(relay.hostname);
@@ -69,16 +71,36 @@ export const App = () => {
   if (!config)
     return <div className="grid h-full place-items-center text-sm text-neutral-400">Loading…</div>;
 
+  const sidebarProps = {
+    relays,
+    selected,
+    busy,
+    iface: config.wireguard.interface,
+    onSelect,
+  };
+
   return (
-    <div className="grid h-full grid-cols-[320px_1fr]">
-      <Sidebar
-        relays={relays}
-        selected={selected}
-        busy={busy}
-        iface={config.wireguard.interface}
-        onSelect={onSelect}
-      />
-      <div className="relative">
+    <div className="relative h-full md:grid md:grid-cols-[320px_1fr]">
+      {drawerOpen && (
+        <button
+          type="button"
+          aria-label="Close relay list"
+          onClick={() => setDrawerOpen(false)}
+          className="fixed inset-0 z-20 bg-black/50 md:hidden"
+        />
+      )}
+
+      <div
+        className={[
+          "fixed inset-x-0 bottom-0 z-30 h-[75vh] overflow-hidden transition-transform duration-300",
+          "md:static md:h-full md:translate-y-0",
+          drawerOpen ? "translate-y-0" : "translate-y-full",
+        ].join(" ")}
+      >
+        <Sidebar {...sidebarProps} onClose={() => setDrawerOpen(false)} />
+      </div>
+
+      <div className="absolute inset-0 md:relative">
         <MapView
           initialViewState={config.map.initial as ViewStateChangeEvent["viewState"]}
           mapStyle={style}
@@ -95,6 +117,15 @@ export const App = () => {
           ))}
         </MapView>
       </div>
+
+      <button
+        type="button"
+        onClick={() => setDrawerOpen(true)}
+        className="fixed bottom-4 left-1/2 z-10 -translate-x-1/2 rounded-full border border-neutral-700 bg-neutral-900/95 px-5 py-2.5 text-sm font-medium text-neutral-100 shadow-lg backdrop-blur md:hidden"
+      >
+        Relays
+      </button>
+
       <Toaster theme="dark" position="bottom-right" />
     </div>
   );

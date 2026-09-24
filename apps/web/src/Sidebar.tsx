@@ -7,9 +7,10 @@ interface Props {
   busy: boolean;
   iface: string;
   onSelect: (relay: Relay) => void;
+  onClose?: () => void;
 }
 
-export const Sidebar = ({ relays, selected, busy, iface, onSelect }: Props) => {
+export const Sidebar = ({ relays, selected, busy, iface, onSelect, onClose }: Props) => {
   const [query, setQuery] = useState("");
 
   const byCountry = useMemo(() => {
@@ -33,11 +34,23 @@ export const Sidebar = ({ relays, selected, busy, iface, onSelect }: Props) => {
   }, [relays, query]);
 
   return (
-    <aside className="flex flex-col overflow-hidden border-r border-neutral-800 bg-neutral-900">
+    <aside className="flex h-full flex-col overflow-hidden border-r border-neutral-800 bg-neutral-900">
       <header className="border-b border-neutral-800 p-4">
         <h1 className="flex items-center gap-2 text-lg font-semibold tracking-wide">
           <img src="/favicon.svg" className="size-6" alt="" aria-hidden="true" />
           Chakana
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close relay list"
+              className="ml-auto rounded-md p-1 text-neutral-400 hover:bg-neutral-800 hover:text-neutral-100 md:hidden"
+            >
+              <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor">
+                <path strokeLinecap="round" strokeWidth="2" d="M6 6l12 12M18 6L6 18" />
+              </svg>
+            </button>
+          )}
         </h1>
         <p className="mt-1 mb-3 font-mono text-xs text-neutral-400">{iface}</p>
         <input
