@@ -67,17 +67,38 @@ export const createMullvadWireguardDriver = (
   };
 };
 
+const waitForInterface = async (
+  cfg: ChakanaConfig,
+  iface: string,
+  timeoutMs = 10000,
+): Promise<boolean> => {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      await sh(cfg.wireguard.ip_command, ["link", "show", iface]);
+      return true;
+    } catch {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+  }
+  return false;
+};
+
 const switchRelay = async (cfg: ChakanaConfig, relay: Relay): Promise<ActionResult> => {
   const newPubKey = relay.public_key;
   const newEndpointIp = relay.ipv4_addr_in;
   const newEndpoint = `${newEndpointIp}:${cfg.wireguard.port}`;
   const iface = cfg.wireguard.interface;
 
-  const oldPubKey = (await queryWireguard(cfg, iface, ["peers"])).split("\n")[0]?.trim();
+  let oldPubKey = (await queryWireguard(cfg, iface, ["peers"])).split("\n")[0]?.trim();
 
   if (!oldPubKey && cfg.wireguard.up_command.length) {
     const up = await runLifecycle(cfg.wireguard.up_command, "up_command");
     if (!up.success) return up;
+    if (!(await waitForInterface(cfg, iface))) {
+      return { success: false, message: `Interface ${iface} did not come up` };
+    }
+    oldPubKey = (await queryWireguard(cfg, iface, ["peers"])).split("\n")[0]?.trim();
   }
 
   const endpointLine = await queryWireguard(cfg, iface, ["endpoints"]);
@@ -106,7 +127,7 @@ const switchRelay = async (cfg: ChakanaConfig, relay: Relay): Promise<ActionResu
     dev,
   ]);
 
-  if (oldPubKey) {
+  if (oldPubKey && oldPubKey !== newPubKey) {
     await sh(cfg.wireguard.wg_command, ["set", iface, "peer", oldPubKey, "remove"]);
   }
 
