@@ -31,6 +31,29 @@ export interface RelayResolver {
   (hostname: string): Promise<Relay | undefined>;
 }
 
+const routeArgs = (cfg: ChakanaConfig, cidr: string, rest: string[]): string[] =>
+  cidr.includes(":") ? ["-6", "route", ...rest] : ["route", ...rest];
+
+const removeCatchAllRoutes = async (cfg: ChakanaConfig, iface: string): Promise<void> => {
+  for (const cidr of cfg.wireguard.allowed_ips) {
+    try {
+      await sh(cfg.wireguard.ip_command, routeArgs(cfg, cidr, ["del", cidr, "dev", iface]));
+    } catch (err) {
+      console.warn(`Could not delete route ${cidr} on ${iface}:`, err);
+    }
+  }
+};
+
+const ensureCatchAllRoutes = async (cfg: ChakanaConfig, iface: string): Promise<void> => {
+  for (const cidr of cfg.wireguard.allowed_ips) {
+    try {
+      await sh(cfg.wireguard.ip_command, routeArgs(cfg, cidr, ["replace", cidr, "dev", iface]));
+    } catch (err) {
+      console.warn(`Could not add route ${cidr} on ${iface}:`, err);
+    }
+  }
+};
+
 export const createMullvadWireguardDriver = (
   cfg: ChakanaConfig,
   resolve: RelayResolver,
@@ -105,6 +128,8 @@ const switchRelay = async (cfg: ChakanaConfig, relay: Relay): Promise<ActionResu
     String(cfg.wireguard.persistent_keepalive),
   ]);
 
+  await ensureCatchAllRoutes(cfg, iface);
+
   return { success: true, message: `Switched ${iface} to ${relay.hostname} (${newEndpoint})` };
 };
 
@@ -126,6 +151,8 @@ const disconnect = async (cfg: ChakanaConfig): Promise<ActionResult> => {
       console.warn(`Could not delete route ${endpointIp}/32:`, err);
     }
   }
+
+  await removeCatchAllRoutes(cfg, iface);
 
   return { success: true, message: `Turned off ${iface}` };
 };
