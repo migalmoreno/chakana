@@ -31,26 +31,15 @@ export interface RelayResolver {
   (hostname: string): Promise<Relay | undefined>;
 }
 
-const routeArgs = (cfg: ChakanaConfig, cidr: string, rest: string[]): string[] =>
-  cidr.includes(":") ? ["-6", "route", ...rest] : ["route", ...rest];
-
-const removeCatchAllRoutes = async (cfg: ChakanaConfig, iface: string): Promise<void> => {
-  for (const cidr of cfg.wireguard.allowed_ips) {
-    try {
-      await sh(cfg.wireguard.ip_command, routeArgs(cfg, cidr, ["del", cidr, "dev", iface]));
-    } catch (err) {
-      console.warn(`Could not delete route ${cidr} on ${iface}:`, err);
-    }
-  }
-};
-
-const ensureCatchAllRoutes = async (cfg: ChakanaConfig, iface: string): Promise<void> => {
-  for (const cidr of cfg.wireguard.allowed_ips) {
-    try {
-      await sh(cfg.wireguard.ip_command, routeArgs(cfg, cidr, ["replace", cidr, "dev", iface]));
-    } catch (err) {
-      console.warn(`Could not add route ${cidr} on ${iface}:`, err);
-    }
+const runLifecycle = async (argv: string[], label: string): Promise<ActionResult> => {
+  const [cmd, ...args] = argv;
+  if (!cmd) return { success: false, message: `No ${label} configured` };
+  try {
+    await sh(cmd, args);
+    return { success: true, message: `${label} succeeded` };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { success: false, message: `${label} failed: ${message}` };
   }
 };
 
@@ -85,6 +74,12 @@ const switchRelay = async (cfg: ChakanaConfig, relay: Relay): Promise<ActionResu
   const iface = cfg.wireguard.interface;
 
   const oldPubKey = (await queryWireguard(cfg, iface, ["peers"])).split("\n")[0]?.trim();
+
+  if (!oldPubKey && cfg.wireguard.up_command.length) {
+    const up = await runLifecycle(cfg.wireguard.up_command, "up_command");
+    if (!up.success) return up;
+  }
+
   const endpointLine = await queryWireguard(cfg, iface, ["endpoints"]);
   const oldEndpointIp = endpointLine.split(/\s+/)[1]?.split(":")[0];
 
@@ -128,13 +123,17 @@ const switchRelay = async (cfg: ChakanaConfig, relay: Relay): Promise<ActionResu
     String(cfg.wireguard.persistent_keepalive),
   ]);
 
-  await ensureCatchAllRoutes(cfg, iface);
-
   return { success: true, message: `Switched ${iface} to ${relay.hostname} (${newEndpoint})` };
 };
 
 const disconnect = async (cfg: ChakanaConfig): Promise<ActionResult> => {
   const iface = cfg.wireguard.interface;
+
+  if (cfg.wireguard.down_command.length) {
+    const down = await runLifecycle(cfg.wireguard.down_command, "down_command");
+    if (!down.success) return down;
+    return { success: true, message: `Turned off ${iface}` };
+  }
 
   const pubKey = (await queryWireguard(cfg, iface, ["peers"])).split("\n")[0]?.trim();
   if (!pubKey) return { success: true, message: `${iface} is already off` };
@@ -151,8 +150,6 @@ const disconnect = async (cfg: ChakanaConfig): Promise<ActionResult> => {
       console.warn(`Could not delete route ${endpointIp}/32:`, err);
     }
   }
-
-  await removeCatchAllRoutes(cfg, iface);
 
   return { success: true, message: `Turned off ${iface}` };
 };

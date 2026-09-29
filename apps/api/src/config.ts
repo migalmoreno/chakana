@@ -22,6 +22,8 @@ const defaults: ChakanaConfig = {
     port: 51820,
     ip_command: "ip",
     wg_command: "wg",
+    up_command: [],
+    down_command: [],
   },
   driver: { active: "mullvad-wireguard" },
   allowed_countries: [],

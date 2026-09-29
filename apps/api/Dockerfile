@@ -14,7 +14,7 @@ RUN npm run build --workspace @chakana/api
 FROM node:24-alpine AS runtime
 WORKDIR /app
 
-RUN apk add --no-cache wireguard-tools iproute2
+RUN apk add --no-cache curl wireguard-tools iproute2
 
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/apps/api/dist ./apps/api/dist

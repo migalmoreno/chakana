@@ -21,6 +21,8 @@ export interface ChakanaConfig {
     port: number;
     ip_command: string;
     wg_command: string;
+    up_command: string[];
+    down_command: string[];
   };
   driver: {
     active: string;
