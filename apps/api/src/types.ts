@@ -10,5 +10,7 @@ export interface PeerRequest {
 export interface PeerStatus {
   connected: boolean;
   driver: string;
+  hostname: string | null;
+  publicKey: string | null;
   message?: string;
 }

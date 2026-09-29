@@ -12,6 +12,8 @@ export interface AppConfig {
 export interface PeerStatusResponse {
   connected: boolean;
   driver: string;
+  hostname: string | null;
+  publicKey: string | null;
   message?: string;
 }
 

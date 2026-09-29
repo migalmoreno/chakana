@@ -99,7 +99,7 @@ export const Sidebar = ({
           <span
             className={[
               "relative h-5 w-9 shrink-0 rounded-full transition",
-              peerOn ? "bg-neutral-600" : "bg-neutral-700",
+              peerOn ? "bg-emerald-500" : "bg-neutral-700",
             ].join(" ")}
           >
             <span

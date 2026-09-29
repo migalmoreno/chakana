@@ -48,9 +48,14 @@ export const App = () => {
       .then((s) => {
         setEnabled(activeDriver, s.connected);
         setPeerStatus(s.connected ? "on" : "off");
+        if (s.connected) {
+          const persisted = useConfigStore.getState().drivers[activeDriver]?.hostname;
+          const name = s.hostname ?? s.publicKey;
+          if (!persisted && name) setHostname(activeDriver, name);
+        }
       })
       .catch(() => setPeerStatus("error"));
-  }, [activeDriver, setEnabled]);
+  }, [activeDriver, setEnabled, setHostname]);
 
   const cities = useMemo(() => {
     const groups = new Map<string, Relay[]>();

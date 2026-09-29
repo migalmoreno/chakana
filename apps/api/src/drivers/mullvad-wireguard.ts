@@ -47,10 +47,10 @@ export const createMullvadWireguardDriver = (
     async disconnect(): Promise<ActionResult> {
       return disconnect(cfg);
     },
-    async connected(): Promise<boolean> {
+    async currentPeer(): Promise<string | null> {
       const iface = cfg.wireguard.interface;
       const peers = await queryWireguard(cfg, iface, ["peers"]);
-      return peers.trim().length > 0;
+      return peers.split("\n")[0]?.trim() || null;
     },
   };
 };

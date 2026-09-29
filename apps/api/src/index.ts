@@ -74,17 +74,41 @@ app.post("/api/switch", async (c) => {
 
 app.get("/api/peer", async (c) => {
   const driver = activeDriver();
-  if (!driver?.connected)
-    return c.json<PeerStatus>({ connected: false, driver: config.driver.active });
+  if (!driver?.currentPeer)
+    return c.json<PeerStatus>({
+      connected: false,
+      driver: config.driver.active,
+      hostname: null,
+      publicKey: null,
+    });
 
   try {
+    const publicKey = await driver.currentPeer();
+    if (!publicKey)
+      return c.json<PeerStatus>({
+        connected: false,
+        driver: config.driver.active,
+        hostname: null,
+        publicKey: null,
+      });
+
+    const collection = await fetchRelays(
+      config.mullvad.relays_url,
+      config.mullvad.cache_ttl_seconds,
+    );
+    const relay = collection.relays.find((r) => r.public_key === publicKey);
     return c.json<PeerStatus>({
-      connected: await driver.connected(),
+      connected: true,
       driver: config.driver.active,
+      hostname: relay?.hostname ?? null,
+      publicKey,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    return c.json<PeerStatus>({ connected: false, driver: config.driver.active, message }, 500);
+    return c.json<PeerStatus>(
+      { connected: false, driver: config.driver.active, hostname: null, publicKey: null, message },
+      500,
+    );
   }
 });
 
