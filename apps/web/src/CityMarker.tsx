@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Marker, Popup } from "react-map-gl/maplibre";
 import type { Relay } from "@chakana/shared";
+import { PEER_TEXT, type PeerStatus } from "./types";
 
 interface Props {
   city: {
@@ -13,10 +14,11 @@ interface Props {
   };
   selected: string | null;
   busy: boolean;
+  peerStatus: PeerStatus;
   onSelect: (relay: Relay) => void;
 }
 
-export const CityMarker = ({ city, selected, busy, onSelect }: Props) => {
+export const CityMarker = ({ city, selected, busy, peerStatus, onSelect }: Props) => {
   const [open, setOpen] = useState(false);
   const containsSelected = city.relays.some((r) => r.hostname === selected);
 
@@ -36,7 +38,7 @@ export const CityMarker = ({ city, selected, busy, onSelect }: Props) => {
           className={[
             "size-3 rounded-full border-2 border-white shadow ring-1 ring-black/40 transition",
             containsSelected
-              ? "scale-125 bg-yellow-400 ring-4 ring-yellow-400/40"
+              ? ["scale-125 bg-current ring-4 ring-current/40", PEER_TEXT[peerStatus]].join(" ")
               : "bg-blue-500 hover:scale-150",
           ].join(" ")}
         />

@@ -1,16 +1,34 @@
 import { useMemo, useState } from "react";
 import type { Relay } from "@chakana/shared";
+import { PEER_TEXT, type PeerStatus } from "./types";
 
 interface Props {
   relays: Relay[];
   selected: string | null;
   busy: boolean;
   iface: string;
+  peerOn: boolean;
+  peerBusy: boolean;
+  peerStatus: PeerStatus;
+  peerName: string | null;
+  onTogglePeer: (enabled: boolean) => void;
   onSelect: (relay: Relay) => void;
   onClose?: () => void;
 }
 
-export const Sidebar = ({ relays, selected, busy, iface, onSelect, onClose }: Props) => {
+export const Sidebar = ({
+  relays,
+  selected,
+  busy,
+  iface,
+  peerOn,
+  peerBusy,
+  peerStatus,
+  peerName,
+  onTogglePeer,
+  onSelect,
+  onClose,
+}: Props) => {
   const [query, setQuery] = useState("");
 
   const byCountry = useMemo(() => {
@@ -53,6 +71,45 @@ export const Sidebar = ({ relays, selected, busy, iface, onSelect, onClose }: Pr
           )}
         </h1>
         <p className="mt-1 mb-3 font-mono text-xs text-neutral-400">{iface}</p>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={peerOn}
+          aria-label="Toggle Mullvad peer"
+          disabled={peerBusy}
+          onClick={() => onTogglePeer(!peerOn)}
+          className="mb-3 flex w-full items-center justify-between gap-3 rounded-md border border-neutral-800 bg-neutral-950 px-2.5 py-2 text-left text-sm transition hover:border-neutral-700 disabled:cursor-wait disabled:opacity-50"
+        >
+          <span className="flex min-w-0 items-center gap-2">
+            <span
+              className={["size-2.5 shrink-0 rounded-full bg-current", PEER_TEXT[peerStatus]].join(
+                " ",
+              )}
+              aria-hidden="true"
+            />
+            <span
+              className={[
+                "truncate font-mono text-xs",
+                peerOn ? "text-neutral-100" : "text-neutral-500",
+              ].join(" ")}
+            >
+              {peerName ?? "No relay"}
+            </span>
+          </span>
+          <span
+            className={[
+              "relative h-5 w-9 shrink-0 rounded-full transition",
+              peerOn ? "bg-neutral-600" : "bg-neutral-700",
+            ].join(" ")}
+          >
+            <span
+              className={[
+                "absolute top-0.5 size-4 rounded-full bg-white transition-all",
+                peerOn ? "left-4.5" : "left-0.5",
+              ].join(" ")}
+            />
+          </span>
+        </button>
         <input
           className="w-full rounded-md border border-neutral-800 bg-neutral-950 px-2.5 py-2 text-sm text-neutral-100 outline-none placeholder:text-neutral-500 focus:border-blue-600"
           placeholder="Search city, country, host…"

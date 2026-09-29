@@ -2,10 +2,19 @@ import { useEffect, useMemo, useState } from "react";
 import MapView, { NavigationControl, type ViewStateChangeEvent } from "react-map-gl/maplibre";
 import { Toaster, toast } from "sonner";
 import type { Relay } from "@chakana/shared";
-import { getConfig, getRelays, switchRelay, type AppConfig } from "./api";
+import {
+  getConfig,
+  getPeerStatus,
+  getRelays,
+  setPeerEnabled,
+  switchRelay,
+  type AppConfig,
+} from "./api";
 import { basemapStyle, registerPmtiles } from "./basemap";
 import { CityMarker } from "./CityMarker";
 import { Sidebar } from "./Sidebar";
+import { useConfigStore } from "./store";
+import type { PeerStatus } from "./types";
 
 const style = basemapStyle("dark");
 
@@ -14,10 +23,19 @@ registerPmtiles();
 export const App = () => {
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [relays, setRelays] = useState<Relay[]>([]);
-  const [selected, setSelected] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [peerBusy, setPeerBusy] = useState(false);
+  const [peerStatus, setPeerStatus] = useState<PeerStatus>("off");
   const [error, setError] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+
+  const activeDriver = useConfigStore((s) => s.driver.active);
+  const driverConfig = useConfigStore((s) => s.drivers[s.driver.active]);
+  const setEnabled = useConfigStore((s) => s.setEnabled);
+  const setHostname = useConfigStore((s) => s.setHostname);
+
+  const selected = driverConfig?.hostname ?? null;
+  const peerOn = driverConfig?.enabled ?? false;
 
   useEffect(() => {
     getConfig()
@@ -26,7 +44,13 @@ export const App = () => {
     getRelays()
       .then((r) => setRelays(r.relays))
       .catch((e) => setError(e.message));
-  }, []);
+    getPeerStatus()
+      .then((s) => {
+        setEnabled(activeDriver, s.connected);
+        setPeerStatus(s.connected ? "on" : "off");
+      })
+      .catch(() => setPeerStatus("error"));
+  }, [activeDriver, setEnabled]);
 
   const cities = useMemo(() => {
     const groups = new Map<string, Relay[]>();
@@ -47,18 +71,49 @@ export const App = () => {
   }, [relays]);
 
   const onSelect = async (relay: Relay) => {
-    setBusy(true);
-    setSelected(relay.hostname);
+    setHostname(activeDriver, relay.hostname);
     setDrawerOpen(false);
+    if (!peerOn) return;
+
+    setBusy(true);
+    setPeerStatus("pending");
     const toastId = toast.loading(`Switching to ${relay.hostname}…`);
     try {
       const result = await switchRelay(relay.hostname);
       toast[result.success ? "success" : "error"](result.message, { id: toastId });
+      setPeerStatus(result.success ? "on" : "error");
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       toast.error(message, { id: toastId });
+      setPeerStatus("error");
     } finally {
       setBusy(false);
+    }
+  };
+
+  const onTogglePeer = async (enabled: boolean) => {
+    if (enabled && !selected) {
+      toast.error("Select a relay first");
+      return;
+    }
+    setPeerBusy(true);
+    setPeerStatus("pending");
+    const toastId = toast.loading(enabled ? "Turning on Mullvad…" : "Turning off Mullvad…");
+    try {
+      const result = await setPeerEnabled(enabled, enabled ? (selected ?? undefined) : undefined);
+      toast[result.success ? "success" : "error"](result.message, { id: toastId });
+      if (result.success) {
+        setEnabled(activeDriver, enabled);
+        setPeerStatus(enabled ? "on" : "off");
+      } else {
+        setPeerStatus("error");
+      }
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      toast.error(message, { id: toastId });
+      setPeerStatus("error");
+    } finally {
+      setPeerBusy(false);
     }
   };
 
@@ -76,6 +131,11 @@ export const App = () => {
     selected,
     busy,
     iface: config.wireguard.interface,
+    peerOn,
+    peerBusy,
+    peerStatus,
+    peerName: selected,
+    onTogglePeer,
     onSelect,
   };
 
@@ -112,6 +172,7 @@ export const App = () => {
               city={city}
               selected={selected}
               busy={busy}
+              peerStatus={peerStatus}
               onSelect={onSelect}
             />
           ))}

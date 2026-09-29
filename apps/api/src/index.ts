@@ -4,7 +4,8 @@ import { cors } from "hono/cors";
 import { loadConfig } from "./config.js";
 import { fetchRelays, findRelay } from "./mullvad.js";
 import { createMullvadWireguardDriver } from "./drivers/mullvad-wireguard.js";
-import type { GeoActionDriver } from "@chakana/shared";
+import type { PeerRequest, PeerStatus, SwitchRequest } from "./types.js";
+import type { ActionResult, GeoActionDriver, Relay } from "@chakana/shared";
 
 const config = await loadConfig();
 
@@ -15,6 +16,18 @@ const resolveRelay = async (hostname: string) => {
 
 const drivers: Record<string, GeoActionDriver> = {
   "mullvad-wireguard": createMullvadWireguardDriver(config, resolveRelay),
+};
+
+const activeDriver = (): GeoActionDriver | undefined => drivers[config.driver.active];
+
+const connectRelay = async (relay: Relay): Promise<ActionResult> => {
+  const driver = activeDriver();
+  if (!driver) return { success: false, message: `No active driver: ${config.driver.active}` };
+  return driver.executeAction({
+    hostname: relay.hostname,
+    countryCode: relay.country_code,
+    countryName: relay.country_name,
+  });
 };
 
 const app = new Hono();
@@ -44,24 +57,61 @@ app.get("/api/relays", async (c) => {
 });
 
 app.post("/api/switch", async (c) => {
-  const body = await c.req.json<{ hostname?: string }>().catch(() => null);
-  const hostname = body?.hostname;
-  if (!hostname) return c.json({ success: false, message: "hostname is required" }, 400);
+  const body = await c.req.json<SwitchRequest>().catch(() => null);
+  if (!body?.hostname) return c.json({ success: false, message: "hostname is required" }, 400);
 
-  const driver = drivers[config.driver.active];
+  const relay = await resolveRelay(body.hostname);
+  if (!relay) return c.json({ success: false, message: `Unknown relay: ${body.hostname}` }, 404);
+
+  try {
+    const result = await connectRelay(relay);
+    return c.json(result, result.success ? 200 : 502);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return c.json({ success: false, message }, 500);
+  }
+});
+
+app.get("/api/peer", async (c) => {
+  const driver = activeDriver();
+  if (!driver?.connected)
+    return c.json<PeerStatus>({ connected: false, driver: config.driver.active });
+
+  try {
+    return c.json<PeerStatus>({
+      connected: await driver.connected(),
+      driver: config.driver.active,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return c.json<PeerStatus>({ connected: false, driver: config.driver.active, message }, 500);
+  }
+});
+
+app.post("/api/peer", async (c) => {
+  const body = await c.req.json<PeerRequest>().catch(() => null);
+  if (typeof body?.enabled !== "boolean")
+    return c.json({ success: false, message: "enabled is required" }, 400);
+
+  const driver = activeDriver();
   if (!driver)
     return c.json({ success: false, message: `No active driver: ${config.driver.active}` }, 500);
 
-  const collection = await fetchRelays(config.mullvad.relays_url, config.mullvad.cache_ttl_seconds);
-  const relay = findRelay(collection, hostname);
-  if (!relay) return c.json({ success: false, message: `Unknown relay: ${hostname}` }, 404);
-
   try {
-    const result = await driver.executeAction({
-      hostname: relay.hostname,
-      countryCode: relay.country_code,
-      countryName: relay.country_name,
-    });
+    if (!body.enabled) {
+      if (!driver.disconnect)
+        return c.json({ success: false, message: "Driver does not support disconnect" }, 501);
+      const result = await driver.disconnect();
+      return c.json(result, result.success ? 200 : 502);
+    }
+
+    if (!body.hostname)
+      return c.json({ success: false, message: "hostname is required to enable" }, 400);
+
+    const relay = await resolveRelay(body.hostname);
+    if (!relay) return c.json({ success: false, message: `Unknown relay: ${body.hostname}` }, 404);
+
+    const result = await connectRelay(relay);
     return c.json(result, result.success ? 200 : 502);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

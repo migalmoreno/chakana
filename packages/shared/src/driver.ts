@@ -12,4 +12,6 @@ export interface GeoActionDriver {
     countryCode: string;
     countryName: string;
   }) => Promise<ActionResult>;
+  disconnect?: () => Promise<ActionResult>;
+  connected?: () => Promise<boolean>;
 }

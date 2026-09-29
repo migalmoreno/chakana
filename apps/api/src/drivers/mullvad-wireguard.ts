@@ -44,6 +44,14 @@ export const createMullvadWireguardDriver = (
       if (!relay) return { success: false, message: `Unknown relay: ${hostname}` };
       return switchRelay(cfg, relay);
     },
+    async disconnect(): Promise<ActionResult> {
+      return disconnect(cfg);
+    },
+    async connected(): Promise<boolean> {
+      const iface = cfg.wireguard.interface;
+      const peers = await queryWireguard(cfg, iface, ["peers"]);
+      return peers.trim().length > 0;
+    },
   };
 };
 
@@ -98,4 +106,26 @@ const switchRelay = async (cfg: ChakanaConfig, relay: Relay): Promise<ActionResu
   ]);
 
   return { success: true, message: `Switched ${iface} to ${relay.hostname} (${newEndpoint})` };
+};
+
+const disconnect = async (cfg: ChakanaConfig): Promise<ActionResult> => {
+  const iface = cfg.wireguard.interface;
+
+  const pubKey = (await queryWireguard(cfg, iface, ["peers"])).split("\n")[0]?.trim();
+  if (!pubKey) return { success: true, message: `${iface} is already off` };
+
+  const endpointLine = await queryWireguard(cfg, iface, ["endpoints"]);
+  const endpointIp = endpointLine.split(/\s+/)[1]?.split(":")[0];
+
+  await sh(cfg.wireguard.wg_command, ["set", iface, "peer", pubKey, "remove"]);
+
+  if (endpointIp) {
+    try {
+      await sh(cfg.wireguard.ip_command, ["route", "del", `${endpointIp}/32`]);
+    } catch (err) {
+      console.warn(`Could not delete route ${endpointIp}/32:`, err);
+    }
+  }
+
+  return { success: true, message: `Turned off ${iface}` };
 };
